@@ -32,6 +32,8 @@ func InitUser(router *gin.RouterGroup) {
 	userRouter.GET("/profile", getProfile)
 	userRouter.PATCH("/name", updateName)
 	userRouter.PATCH("/calendar-options", updateCalendarOptions)
+	userRouter.PUT("/usual-week", updateUsualWeek)
+	userRouter.DELETE("/usual-week", deleteUsualWeek)
 	userRouter.GET("/events", getEvents)
 	userRouter.POST("/events/:eventId/set-folder", setEventFolder)
 	userRouter.GET("/calendars", getCalendars)
@@ -136,6 +138,51 @@ func updateCalendarOptions(c *gin.Context) {
 	// Update database
 	_, err := db.UsersCollection.UpdateByID(context.Background(), authUser.Id, bson.M{
 		"$set": bson.M{"calendarOptions": authUser.CalendarOptions},
+	})
+	if err != nil {
+		logger.StdErr.Panicln(err)
+	}
+
+	c.JSON(http.StatusOK, gin.H{})
+}
+
+// @Summary Saves the times the user is usually free
+// @Description Replaces the user's usual week, which pre-fills new polls. Days[0] is Sunday; times are minutes since local midnight in the given timezone.
+// @Tags user
+// @Accept json
+// @Produce json
+// @Param payload body models.UsualWeek true "The usual week"
+// @Success 200
+// @Router /user/usual-week [put]
+func updateUsualWeek(c *gin.Context) {
+	var payload models.UsualWeek
+	if err := c.BindJSON(&payload); err != nil {
+		return
+	}
+	if err := payload.Validate(); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	authUser := utils.GetAuthUser(c)
+	_, err := db.UsersCollection.UpdateByID(context.Background(), authUser.Id, bson.M{
+		"$set": bson.M{"usualWeek": payload},
+	})
+	if err != nil {
+		logger.StdErr.Panicln(err)
+	}
+
+	c.JSON(http.StatusOK, gin.H{})
+}
+
+// @Summary Deletes the user's usual week
+// @Tags user
+// @Success 200
+// @Router /user/usual-week [delete]
+func deleteUsualWeek(c *gin.Context) {
+	authUser := utils.GetAuthUser(c)
+	_, err := db.UsersCollection.UpdateByID(context.Background(), authUser.Id, bson.M{
+		"$unset": bson.M{"usualWeek": ""},
 	})
 	if err != nil {
 		logger.StdErr.Panicln(err)

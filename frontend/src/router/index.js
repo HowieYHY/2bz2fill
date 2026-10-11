@@ -23,6 +23,11 @@ const routes = [
     component: () => import("@/views/Settings.vue"),
   },
   {
+    path: "/usual-week",
+    name: "usual-week",
+    component: () => import("@/views/UsualWeek.vue"),
+  },
+  {
     path: "/e/:eventId",
     name: "event",
     component: () => import("@/views/Event.vue"),

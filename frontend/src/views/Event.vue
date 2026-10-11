@@ -18,6 +18,38 @@
         @uploadICS="uploadICS"
       />
 
+      <!-- Offer to save the response just submitted as the usual week -->
+      <v-snackbar
+        v-model="usualWeekOffer"
+        bottom
+        :timeout="20000"
+        color="white"
+        light
+        multi-line
+      >
+        <div class="tw-text-sm tw-text-black">
+          <div class="tw-font-medium">Save this as your usual week?</div>
+          <div class="tw-text-dark-gray">
+            New polls will arrive filled in from it. You can still edit each
+            one.
+          </div>
+        </div>
+        <template v-slot:action="{ attrs }">
+          <v-btn v-bind="attrs" text @click="dismissUsualWeekOffer">
+            No thanks
+          </v-btn>
+          <v-btn
+            v-bind="attrs"
+            text
+            color="primary"
+            :loading="savingUsualWeek"
+            @click="saveUsualWeekFromResponse"
+          >
+            Save
+          </v-btn>
+        </template>
+      </v-snackbar>
+
       <!-- Google sign in not supported dialog -->
       <SignInNotSupportedDialog v-model="webviewDialog" />
 
@@ -425,7 +457,13 @@ import {
 } from "@/utils"
 import { isBetween } from "@/utils/general_utils"
 import { validateEmail } from "@/utils"
-import { mapActions, mapState, mapMutations } from "vuex"
+import { mapActions, mapState, mapMutations, mapGetters } from "vuex"
+import {
+  emptyUsualWeek,
+  getBrowserTimezone,
+  mergeSlotsIntoUsualWeek,
+  usualWeekStatuses,
+} from "@/utils/usual_week_utils"
 import dayjs from "dayjs"
 import utcPlugin from "dayjs/plugin/utc"
 import timezonePlugin from "dayjs/plugin/timezone"
@@ -487,6 +525,11 @@ export default {
     pagesNotVisitedUnderstood: false,
     helpDialog: false,
 
+    // Offer to save a submitted response as the usual week
+    usualWeekOffer: false,
+    usualWeekOfferResponse: null, // From ScheduleOverlap.getUsualWeekSlots()
+    savingUsualWeek: false,
+
     loading: true,
     calendarEventsMap: {},
     event: null,
@@ -523,6 +566,7 @@ export default {
 
   computed: {
     ...mapState(["authUser", "events"]),
+    ...mapGetters(["usualWeek"]),
     allowScheduleEvent() {
       return this.scheduleOverlapComponent?.allowScheduleEvent
     },
@@ -618,9 +662,13 @@ export default {
         return
       }
 
-      // Start editing if calendar permission granted or user has responded, otherwise show choice dialog
+      // Start editing if calendar permission granted, the user has a usual week, or the user has responded,
+      // otherwise show choice dialog
+      const prefillFromUsualWeek =
+        this.usualWeek && !this.isSignUp && !this.isGroup
       if (
         (this.authUser && this.calendarPermissionGranted) ||
+        prefillFromUsualWeek ||
         this.userHasResponded
       ) {
         this.scheduleOverlapComponent.startEditing()
@@ -802,6 +850,7 @@ export default {
       }
 
       let changesPersisted = true
+      const usualWeekOfferResponse = this.getUsualWeekOfferResponse()
 
       if (this.isSignUp) {
         changesPersisted =
@@ -813,6 +862,7 @@ export default {
       if (changesPersisted) {
         this.showInfo("Changes saved!")
         this.scheduleOverlapComponent.stopEditing()
+        this.offerUsualWeek(usualWeekOfferResponse)
       }
     },
     async saveChangesAsGuest(payload) {
@@ -820,13 +870,68 @@ export default {
       if (!this.scheduleOverlapComponent) return
 
       if (payload.name.length > 0) {
+        const usualWeekOfferResponse = this.getUsualWeekOfferResponse()
         await this.scheduleOverlapComponent.submitAvailability(payload)
 
         this.showInfo("Changes saved!")
+        this.offerUsualWeek(usualWeekOfferResponse)
         this.scheduleOverlapComponent.resetCurUserAvailability()
         this.scheduleOverlapComponent.stopEditing()
         this.guestDialog = false
         this.addingAvailabilityAsGuest = false
+      }
+    },
+
+    /**
+      Returns the response being submitted for the "save as your usual week" offer, or null if it shouldn't be offered:
+      the user already has a usual week, said no before, or this isn't their own availability.
+      Called before submitting, since submitting resets the editing state.
+    */
+    getUsualWeekOfferResponse() {
+      if (this.usualWeek || this.isSignUp || this.isGroup) return null
+      if (!this.scheduleOverlapComponent?.canUseUsualWeek) return null
+      try {
+        if (localStorage["usualWeekOfferDismissed"]) return null
+      } catch {
+        return null
+      }
+      const response = this.scheduleOverlapComponent.getUsualWeekSlots()
+      const hasFreeTime = response.slots.some(
+        (s) => s.status !== usualWeekStatuses.BUSY
+      )
+      return hasFreeTime ? response : null
+    },
+    offerUsualWeek(response) {
+      if (!response) return
+      this.usualWeekOfferResponse = response
+      this.usualWeekOffer = true
+    },
+    dismissUsualWeekOffer() {
+      this.usualWeekOffer = false
+      try {
+        localStorage["usualWeekOfferDismissed"] = "true"
+      } catch {
+        // Storage unavailable: the offer may show again, which is harmless
+      }
+    },
+    async saveUsualWeekFromResponse() {
+      const { slots, options, timezone } = this.usualWeekOfferResponse
+      this.savingUsualWeek = true
+      try {
+        const usualWeek = mergeSlotsIntoUsualWeek(
+          emptyUsualWeek(timezone || getBrowserTimezone()),
+          slots,
+          options
+        )
+        await this.$store.dispatch("saveUsualWeek", usualWeek)
+        this.usualWeekOffer = false
+        this.showInfo("Saved as your usual week. New polls will arrive filled in.")
+      } catch (err) {
+        this.showError(
+          "Couldn't save your usual week. Check your connection and try again."
+        )
+      } finally {
+        this.savingUsualWeek = false
       }
     },
 

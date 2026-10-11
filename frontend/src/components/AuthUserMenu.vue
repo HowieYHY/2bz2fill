@@ -13,6 +13,12 @@
             <strong>{{ `${authUser.firstName} ${authUser.lastName}` }}</strong>
           </v-list-item-title>
         </v-list-item>
+        <v-list-item id="usual-week-btn" @click="goToUsualWeek">
+          <v-list-item-title class="tw-flex tw-items-center tw-gap-1">
+            <v-icon class="tw-mr-1" small color="black">mdi-calendar-week</v-icon>
+            My usual week
+          </v-list-item-title>
+        </v-list-item>
         <v-list-item id="settings-btn" @click="goToSettings">
           <v-list-item-title class="tw-flex tw-items-center tw-gap-1">
             <v-icon class="tw-mr-1" small color="black">mdi-cog</v-icon>
@@ -60,6 +66,9 @@ export default {
       this.setAuthUser(null)
       this.$posthog?.reset()
       location.reload()
+    },
+    goToUsualWeek() {
+      this.$router.push({ name: "usual-week" })
     },
     goToSettings() {
       this.$router.replace({ name: "settings" })

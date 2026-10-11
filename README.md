@@ -40,13 +40,26 @@ of responding.
   To try it, upload [`docs/sample-calendar.ics`](./docs/sample-calendar.ics) to a poll covering
   Oct 12–25, 2026, 9am–9pm, Singapore time.
 
+- **My usual week**: mark the times you're usually free once (available or "if needed"), and every
+  new poll you open arrives filled in from it, ready to check and submit.
+  - Set it up on the My usual week page (`/usual-week`, also in the account menu), starting from a
+    blank week or "weekdays 9am–5pm". Or, after submitting your first response, click "Save" on the
+    "Save this as your usual week?" offer: the weekdays and hours that poll covers are copied in.
+  - Signed in, it's saved to your account and works on every device. Signed out, it's saved in this
+    browser only and moves to your account the next time you save it while signed in.
+  - Times are wall-clock times in your time zone, so "9am" stays 9am across daylight-saving changes
+    and in polls shown in other time zones. Works for date polls and days-of-the-week polls; not
+    used for groups, sign-up forms or days-only polls.
+  - Combines with everything else: connected calendars, an uploaded `.ics` file, buffer time and
+    working hours still block time inside your usual free hours.
+  - Your usual week is never shown to other people on a poll, only the availability you submit.
+
 ### Planned, in order
 
-1. Save "my usual week" once and have every new poll arrive pre-filled from it.
-2. Fast manual tools: mark busy times instead of free ones, fill or clear a whole day, copy a day,
+1. Fast manual tools: mark busy times instead of free ones, fill or clear a whole day, copy a day,
    reuse your last response.
-3. Pre-filled responses you only need to check and confirm.
-4. A grid that works well on a phone.
+2. Pre-filled responses you only need to check and confirm.
+3. A grid that works well on a phone.
 
 The Timeful-specific parts (their branding, blog, socials, analytics, donation links and the
 When2meet converter, which runs on Timeful's own servers) have been removed.

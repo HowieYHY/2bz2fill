@@ -47,6 +47,12 @@
           if you sign in with them.
         </li>
         <li>Your settings, such as working hours and time zone.</li>
+        <li>
+          Your usual week, if you set one up: the times you're usually free each
+          day of the week and your time zone, used to fill in new polls for you.
+          If you're not signed in, it's saved only in your browser and never
+          sent to us.
+        </li>
       </ul>
 
       <h3>If you connect a calendar</h3>
@@ -85,7 +91,8 @@
         </li>
         <li>
           A sign-in cookie that keeps you signed in, and small settings saved in
-          your browser (for example your cookie choices).
+          your browser (for example your cookie choices, or your usual week if
+          you're not signed in).
         </li>
       </ul>
       <p>We don't run analytics or advertising trackers.</p>
@@ -143,6 +150,9 @@
         <li>
           You can delete your account in Settings. This removes your account and
           connected calendars.
+        </li>
+        <li>
+          You can delete your usual week at any time on the My usual week page.
         </li>
         <li>
           You can disconnect a calendar at any time in Settings, and revoke
