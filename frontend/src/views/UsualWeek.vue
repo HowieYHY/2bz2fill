@@ -86,7 +86,11 @@
         <div
           class="tw-flex tw-flex-wrap tw-items-center tw-justify-between tw-gap-x-4 tw-gap-y-1 tw-text-xs tw-text-dark-gray"
         >
-          <span
+          <span v-if="isPhone"
+            >Tap a time, or touch and hold, then drag, to mark several. Do the
+            same over marked times, or use Busy, to clear them.</span
+          >
+          <span v-else
             >Drag across the grid to mark times. Drag over marked times, or use
             Busy, to clear them.</span
           >

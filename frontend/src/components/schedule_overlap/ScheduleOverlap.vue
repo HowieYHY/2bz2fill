@@ -1235,6 +1235,11 @@ import SpecificTimesInstructions from "./SpecificTimesInstructions.vue"
 dayjs.extend(utcPlugin)
 dayjs.extend(timezonePlugin)
 
+// Touch and hold this long (ms) before dragging paints, so a swipe can still scroll the page
+const TOUCH_HOLD_MS = 250
+// How far (px) a finger can wander during the hold before it counts as a scroll
+const TOUCH_MOVE_TOLERANCE = 10
+
 export default {
   name: "ScheduleOverlap",
   props: {
@@ -1328,12 +1333,12 @@ export default {
       },
       SPLIT_GAP_HEIGHT: 40,
       SPLIT_GAP_WIDTH: 20,
-      HOUR_HEIGHT: 60,
       timeslot: {
         width: 0,
         height: 0,
       },
       dragging: false,
+      touchHold: null, // A touch on the grid that may become a tap, a drag, or a scroll (see onTouchStart)
       dragType: "add",
       dragStart: null,
       dragCur: null,
@@ -2174,6 +2179,10 @@ export default {
     timeslotDuration() {
       return this.event.timeIncrement ?? timeslotDurations.FIFTEEN_MINUTES
     },
+    /** Height of an hour on the grid: taller on phones so a 15 minute row is big enough to tap */
+    HOUR_HEIGHT() {
+      return this.isPhone && !this.calendarOnly ? 96 : 60
+    },
     timeslotHeight() {
       if (this.timeslotDuration === timeslotDurations.FIFTEEN_MINUTES) {
         return Math.floor(this.HOUR_HEIGHT / 4)
@@ -2250,12 +2259,12 @@ export default {
           case this.states.EDIT_AVAILABILITY:
             const daysOrTimes = this.event.daysOnly ? "days" : "times"
             if (this.availabilityType === availabilityTypes.IF_NEEDED) {
-              return `Tap and drag to add your "if needed" ${daysOrTimes} in yellow.`
+              return `Tap a time to mark it "if needed", or touch and hold, then drag, to mark several.`
             }
             if (this.availabilityType === availabilityTypes.BUSY) {
-              return `Tap and drag over the ${daysOrTimes} you're busy.`
+              return `Tap a time you're busy, or touch and hold, then drag, to clear several.`
             }
-            return `Tap and drag to add your "available" ${daysOrTimes} in green.`
+            return `Tap a time to mark it available, or touch and hold, then drag, to mark several.`
           case this.states.SCHEDULE_EVENT:
             return "Tap and drag on the calendar to schedule a Google Calendar event during those times."
           default:
@@ -4086,6 +4095,84 @@ export default {
     // -----------------------------------
     //#region Drag Stuff
     // -----------------------------------
+    /*
+      Touch on the grid while editing:
+      - swipe: scrolls the page as usual (the grid no longer traps the finger)
+      - tap: marks or clears one time
+      - touch and hold, then drag: marks or clears a range, like dragging with a mouse
+      Outside editing, touches behave as before.
+    */
+    onTouchStart(e) {
+      this.clearTouchHold()
+      if (!this.allowDrag || e.touches.length > 1) {
+        this.startDrag(e)
+        return
+      }
+      const { clientX, clientY } = e.touches[0]
+      const startEvent = {
+        touches: [{ clientX, clientY }],
+        currentTarget: e.currentTarget,
+        preventDefault: () => {},
+      }
+      this.touchHold = {
+        x: clientX,
+        y: clientY,
+        startEvent,
+        started: false,
+        timer: setTimeout(() => {
+          if (!this.touchHold) return
+          this.touchHold.started = true
+          this.startDrag(startEvent)
+          navigator.vibrate?.(10)
+        }, TOUCH_HOLD_MS),
+      }
+    },
+    onTouchMove(e) {
+      const hold = this.touchHold
+      if (!hold) {
+        this.moveDrag(e)
+        return
+      }
+      if (hold.started) {
+        this.moveDrag(e)
+        return
+      }
+      // Moved before the hold: it's a scroll, so let the browser have it
+      const { clientX, clientY } = e.touches[0]
+      if (Math.hypot(clientX - hold.x, clientY - hold.y) > TOUCH_MOVE_TOLERANCE) {
+        this.clearTouchHold()
+      }
+    },
+    onTouchEnd(e) {
+      const hold = this.touchHold
+      if (!hold) {
+        this.endDrag(e)
+        return
+      }
+      this.clearTouchHold()
+      if (!hold.started) {
+        // A tap: mark or clear the one time under the finger
+        this.startDrag(hold.startEvent)
+      }
+      this.endDrag(e)
+      // Stop the browser from also sending mouse events for this touch, which would toggle it back
+      if (e.cancelable) e.preventDefault()
+    },
+    /** The browser took over the touch (e.g. a system gesture): abandon it instead of applying it */
+    onTouchCancel() {
+      this.clearTouchHold()
+      this.cancelDrag()
+    },
+    clearTouchHold() {
+      if (this.touchHold) clearTimeout(this.touchHold.timer)
+      this.touchHold = null
+    },
+    /** Stops a drag without changing anything */
+    cancelDrag() {
+      this.dragging = false
+      this.dragStart = null
+      this.dragCur = null
+    },
     normalizeXY(e) {
       /* Normalize the touch/mouse event to be relative to element */
       let clientX, clientY
@@ -5060,10 +5147,10 @@ export default {
     if (!this.calendarOnly) {
       const timesEl = dragSection
       if (timesEl && isTouchEnabled()) {
-        timesEl.addEventListener("touchstart", this.startDrag)
-        timesEl.addEventListener("touchmove", this.moveDrag)
-        timesEl.addEventListener("touchend", this.endDrag)
-        timesEl.addEventListener("touchcancel", this.endDrag)
+        timesEl.addEventListener("touchstart", this.onTouchStart)
+        timesEl.addEventListener("touchmove", this.onTouchMove)
+        timesEl.addEventListener("touchend", this.onTouchEnd)
+        timesEl.addEventListener("touchcancel", this.onTouchCancel)
       }
       if (timesEl) {
         timesEl.addEventListener("mousedown", this.startDrag)

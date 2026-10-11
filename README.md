@@ -72,9 +72,10 @@ of responding.
   Check it, change anything that's different this time, and press Save. As a guest, the name and
   email you last used are remembered in this browser, so confirming is Save, then Continue.
 
-### Planned, in order
-
-1. A grid that works well on a phone.
+- **A grid that works on a phone**: while filling in a poll or your usual week, a swipe scrolls the
+  page even when it starts on the grid, a tap marks or clears one time, and touch and hold, then
+  drag, marks a range. Rows are taller on phones (a 15-minute row is 24px instead of 15px), and a
+  touch the browser cancels no longer paints anything. Mouse dragging on a computer is unchanged.
 
 The Timeful-specific parts (their branding, blog, socials, analytics, donation links and the
 When2meet converter, which runs on Timeful's own servers) have been removed.
