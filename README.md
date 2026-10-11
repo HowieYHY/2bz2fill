@@ -20,14 +20,33 @@ Built with [Vue 2](https://github.com/vuejs/vue), [MongoDB](https://github.com/m
 ## How it differs from Timeful
 
 Timeful is a general scheduling poll. 2bz2fill keeps its features and focuses on cutting the work
-of responding. Planned, in order:
+of responding.
 
-1. Upload an `.ics` file to fill the grid from any calendar app, with no account or sign-in.
-2. Save "my usual week" once and have every new poll arrive pre-filled from it.
-3. Fast manual tools: mark busy times instead of free ones, fill or clear a whole day, copy a day,
+### Done
+
+- **Fill the grid from an `.ics` file**, exported from any calendar app (Google, Outlook, Apple, a
+  school or work timetable), with no account or sign-in. Busy times are shaded out, everything
+  else is marked available, and you can edit before submitting.
+  - The file is read in the browser and never uploaded; only the availability you submit is saved.
+  - Repeating events work, including skipped and moved occurrences, and times stay correct across
+    daylight-saving changes. Events marked "free" don't block time.
+  - All-day events are listed for you to tick: multi-day ones (trips, leave) start ticked, single
+    days (holidays, birthdays) don't.
+  - Two ways in: "Upload a calendar file (.ics)" in the "How would you like to add your
+    availability?" dialog, or "Autofill from a .ics file" next to the grid while editing.
+  - Buffer time, working hours and connected calendars still apply; if you're signed in with
+    Google, both sources block time.
+
+  To try it, upload [`docs/sample-calendar.ics`](./docs/sample-calendar.ics) to a poll covering
+  Oct 12–25, 2026, 9am–9pm, Singapore time.
+
+### Planned, in order
+
+1. Save "my usual week" once and have every new poll arrive pre-filled from it.
+2. Fast manual tools: mark busy times instead of free ones, fill or clear a whole day, copy a day,
    reuse your last response.
-4. Pre-filled responses you only need to check and confirm.
-5. A grid that works well on a phone.
+3. Pre-filled responses you only need to check and confirm.
+4. A grid that works well on a phone.
 
 The Timeful-specific parts (their branding, blog, socials, analytics, donation links and the
 When2meet converter, which runs on Timeful's own servers) have been removed.
@@ -36,7 +55,7 @@ When2meet converter, which runs on Timeful's own servers) have been removed.
 
 - See when everybody's availability overlaps
 - Date and time ranges, or days of the week
-- Autofill from Google Calendar, Outlook, Apple Calendar or an ICS feed URL
+- Autofill from Google Calendar, Outlook, Apple Calendar or an ICS feed URL (signed-in users)
 - "Available" vs. "If needed" times
 - See when a subset of people are available
 - Time zone support

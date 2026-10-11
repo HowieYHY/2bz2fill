@@ -16,6 +16,16 @@
             You can always manually edit after autofilling
           </div>
           <div class="tw-flex tw-flex-col tw-gap-2">
+            <v-btn block @click="uploadICS" class="tw-bg-white">
+              <div class="tw-flex tw-w-full tw-items-center tw-gap-2">
+                <v-icon class="tw-flex-initial" size="20">
+                  mdi-calendar-import
+                </v-icon>
+                <v-spacer />
+                Upload a calendar file (.ics)
+                <v-spacer />
+              </div>
+            </v-btn>
             <v-btn block @click="autofillWithGcal" class="tw-bg-white">
               <div class="tw-flex tw-w-full tw-items-center tw-gap-2">
                 <v-img
@@ -162,6 +172,10 @@ export default {
     ...mapActions(["showInfo"]),
     setAvailabilityManually() {
       this.$emit("setAvailabilityManually")
+    },
+    uploadICS() {
+      this.$posthog.capture("upload_ics_clicked")
+      this.$emit("uploadICS")
     },
     autofillWithGcal() {
       this.$posthog.capture("autofill_with_gcal_clicked")

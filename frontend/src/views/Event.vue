@@ -15,6 +15,7 @@
         @setAvailabilityManually="setAvailabilityManually"
         @addedAppleCalendar="addedAppleCalendar"
         @addedICSCalendar="addedICSCalendar"
+        @uploadICS="uploadICS"
       />
 
       <!-- Google sign in not supported dialog -->
@@ -875,6 +876,11 @@ export default {
       this.choiceDialog = false
       this.scheduleOverlapComponent?.startEditing()
       this.scheduleOverlapComponent?.setAvailabilityAutomatically()
+    },
+    /** Called when user chooses to upload an .ics file */
+    uploadICS() {
+      this.choiceDialog = false
+      this.scheduleOverlapComponent?.openIcsUpload()
     },
     /** Called when user adds ICS calendar account */
     addedICSCalendar() {
