@@ -4354,7 +4354,12 @@ export default {
 
     /** Recalculate availability the calendar based on calendar events */
     reanimateAvailability() {
+      // Don't autofill if no calendar loaded, otherwise every slot would be marked available
+      const calendarResults = Object.values(this.calendarEventsMap ?? {})
+      const allCalendarsErrored =
+        calendarResults.length > 0 && calendarResults.every((c) => c.error)
       if (
+        !allCalendarsErrored &&
         this.state === this.states.EDIT_AVAILABILITY &&
         this.authUser &&
         !(this.authUser?._id in this.event.responses) && // User hasn't responded yet

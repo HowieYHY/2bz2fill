@@ -13,26 +13,26 @@
             @change="(enabled) => toggleCalendarAccount(enabled)"
             hide-details
           />
-          <div
-            v-if="hasSubCalendars"
-            class="-tw-ml-2 tw-h-fit tw-w-fit tw-cursor-pointer"
-            @click="
-              () => {
-                showSubCalendars = !showSubCalendars
-              }
-            "
-          >
-            <!-- Make sure tailwind classes are compiled -->
-            <div class="tw-rotate-0 tw-rotate-90"></div>
-
-            <v-icon
-              :class="`tw-rotate-${showSubCalendars ? 90 : 0}`"
-              class="tw-text-dark-gray tw-transition-all"
-              >mdi-chevron-right</v-icon
-            >
-          </div>
         </div>
         <UserAvatarContent v-else :size="24" :user="account" />
+        <div
+          v-if="hasSubCalendars"
+          class="-tw-ml-2 tw-h-fit tw-w-fit tw-cursor-pointer"
+          @click="
+            () => {
+              showSubCalendars = !showSubCalendars
+            }
+          "
+        >
+          <!-- Make sure tailwind classes are compiled -->
+          <div class="tw-rotate-0 tw-rotate-90"></div>
+
+          <v-icon
+            :class="`tw-rotate-${showSubCalendars ? 90 : 0}`"
+            class="tw-text-dark-gray tw-transition-all"
+            >mdi-chevron-right</v-icon
+          >
+        </div>
         <div
           :class="toggleState && !fillSpace ? 'tw-w-[180px]' : ''"
           class="tw-align-text-middle tw-inline-block tw-break-words tw-text-sm"

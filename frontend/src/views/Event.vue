@@ -500,6 +500,7 @@ export default {
 
     availabilityBtnOpacity: 1,
     hasRefetchedAuthUserCalendarEvents: false,
+    shownCalendarErrorWarning: false,
 
     // Availability Groups
     calendarAvailabilities: {}, // maps userId to their calendar events
@@ -978,8 +979,17 @@ export default {
             }
           }
 
-          // Set user availability automatically if we're in editing mode and they haven't responded
+          const erroredAccounts = Object.keys(this.calendarEventsMap).filter(
+            (key) => Boolean(this.calendarEventsMap[key].error)
+          )
+          const allCalendarsErrored =
+            erroredAccounts.length > 0 &&
+            erroredAccounts.length === Object.keys(this.calendarEventsMap).length
+
+          // Set user availability automatically if we're in editing mode and they haven't responded.
+          // Skip if no calendar loaded, otherwise every slot would be marked available
           if (
+            !allCalendarsErrored &&
             this.authUser &&
             this.isEditing &&
             !this.userHasResponded &&
@@ -997,17 +1007,25 @@ export default {
           ).every((c) => Boolean(c.error))
 
           if (!this.hasRefetchedAuthUserCalendarEvents) {
-            const hasAtLeastOneError = Object.values(
-              this.calendarEventsMap
-            ).some((c) => Boolean(c.error))
-
             // Refetch calendar if there is an error
-            if (hasAtLeastOneError) {
+            if (erroredAccounts.length > 0) {
               this.hasRefetchedAuthUserCalendarEvents = true
               setTimeout(() => {
                 this.fetchAuthUserCalendarEvents()
               }, 1000)
             }
+          } else if (
+            erroredAccounts.length > 0 &&
+            !this.shownCalendarErrorWarning
+          ) {
+            // Still failing after the retry, so tell the user instead of failing silently
+            this.shownCalendarErrorWarning = true
+            const emails = erroredAccounts
+              .map((key) => key.slice(0, key.lastIndexOf("_"))) // Keys are `${email}_${calendarType}`
+              .join(", ")
+            this.showError(
+              `Couldn't load events from ${emails}. Those calendars won't block any of your time.`
+            )
           }
         })
         .catch((err) => {
