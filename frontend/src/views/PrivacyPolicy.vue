@@ -92,8 +92,9 @@
         <li>
           A sign-in cookie that keeps you signed in, and small settings saved in
           your browser (for example your cookie choices, your usual week if
-          you're not signed in, and a copy of the last availability you
-          submitted so you can reuse it on your next poll).
+          you're not signed in, a copy of the last availability you submitted
+          so you can reuse it on your next poll, and the name and email you
+          last answered with as a guest so you don't have to type them again).
         </li>
       </ul>
       <p>We don't run analytics or advertising trackers.</p>

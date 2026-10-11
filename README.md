@@ -67,10 +67,14 @@ of responding.
   - Run `server/scripts/20261012_event_responses_user_index` once on an existing database: it adds
     the index the account lookup (and the home page's event list) uses.
 
+- **Check and confirm**: with a usual week set up, opening a poll you haven't answered (and didn't
+  create) goes straight to your response, already filled in, with a note above the grid saying so.
+  Check it, change anything that's different this time, and press Save. As a guest, the name and
+  email you last used are remembered in this browser, so confirming is Save, then Continue.
+
 ### Planned, in order
 
-1. Pre-filled responses you only need to check and confirm.
-2. A grid that works well on a phone.
+1. A grid that works well on a phone.
 
 The Timeful-specific parts (their branding, blog, socials, analytics, donation links and the
 When2meet converter, which runs on Timeful's own servers) have been removed.

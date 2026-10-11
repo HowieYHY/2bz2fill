@@ -60,6 +60,7 @@
 
 <script>
 import { isPhone, validateEmail } from "@/utils"
+import { loadGuestProfile } from "@/utils/guest_profile_utils"
 
 export default {
   name: "GuestDialog",
@@ -111,8 +112,10 @@ export default {
   watch: {
     value() {
       if (this.value) {
-        this.name = ""
-        this.email = ""
+        // Start from the details last used as a guest, so confirming is one click
+        const profile = loadGuestProfile()
+        this.name = profile?.name ?? ""
+        this.email = profile?.email ?? ""
         this.nameRules = []
         this.emailRules = []
 
