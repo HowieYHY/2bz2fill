@@ -810,25 +810,6 @@
                     >
                   </div>
                 </div>
-                <!-- Pre-filled from the usual week -->
-                <div
-                  v-if="usualWeekApplied && state === states.EDIT_AVAILABILITY"
-                  class="tw-flex tw-items-start tw-gap-1 tw-text-xs tw-text-dark-gray"
-                >
-                  <v-icon x-small color="#6B6B6B" class="tw-mt-px"
-                    >mdi-calendar-week</v-icon
-                  >
-                  <span>
-                    Pre-filled from your usual week ·
-                    <a
-                      href="/usual-week"
-                      target="_blank"
-                      rel="noopener"
-                      class="tw-text-dark-gray tw-underline"
-                      >Edit</a
-                    >
-                  </span>
-                </div>
                 <!-- User's calendar accounts -->
                 <CalendarAccounts
                   v-if="
@@ -3058,7 +3039,8 @@ export default {
               setTimeout(() => {
                 this.availabilityAnimEnabled = false
 
-                if (this.showSnackbar) {
+                // When filled from the usual week, the notice above the grid says so instead
+                if (this.showSnackbar && !this.usualWeekApplied) {
                   this.showInfo("Your availability has been autofilled!")
                 }
                 this.unsavedChanges = false

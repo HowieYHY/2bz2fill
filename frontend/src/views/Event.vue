@@ -312,6 +312,34 @@
             />
           </div>
 
+          <!-- Pre-filled from the usual week: check and save -->
+          <v-expand-transition>
+            <div v-if="showPrefillNotice" class="tw-px-4 sm:tw-px-0">
+              <div
+                class="tw-mt-4 tw-flex tw-items-start tw-gap-2 tw-rounded-md tw-border tw-border-pale-green tw-bg-ligher-green tw-px-3 tw-py-2.5 tw-text-sm tw-text-very-dark-gray"
+                role="status"
+              >
+                <v-icon small color="#1C7D45" class="tw-mt-0.5"
+                  >mdi-calendar-check-outline</v-icon
+                >
+                <div>
+                  <span class="tw-font-medium tw-text-dark-green"
+                    >Filled in from your usual week.</span
+                  >
+                  Check the times, change anything that's different this time,
+                  then press Save.
+                  <a
+                    href="/usual-week"
+                    target="_blank"
+                    rel="noopener"
+                    class="tw-whitespace-nowrap tw-text-dark-green tw-underline tw-underline-offset-2"
+                    >Edit usual week</a
+                  >
+                </div>
+              </div>
+            </div>
+          </v-expand-transition>
+
           <!-- Calendar -->
 
           <ScheduleOverlap
@@ -465,6 +493,7 @@ import {
   usualWeekStatuses,
 } from "@/utils/usual_week_utils"
 import { saveLocalLastResponse } from "@/utils/last_response_utils"
+import { saveGuestProfile } from "@/utils/guest_profile_utils"
 import dayjs from "dayjs"
 import utcPlugin from "dayjs/plugin/utc"
 import timezonePlugin from "dayjs/plugin/timezone"
@@ -529,6 +558,7 @@ export default {
     // Offer to save a submitted response as the usual week
     usualWeekOffer: false,
     usualWeekOfferResponse: null, // From ScheduleOverlap.getUsualWeekSlots()
+    autoPrefillChecked: false, // Whether we've decided if this poll should open already filled in
     savingUsualWeek: false,
 
     loading: true,
@@ -582,6 +612,12 @@ export default {
     },
     isScheduling() {
       return this.scheduleOverlapComponent?.scheduling
+    },
+    /** Whether the response being edited was filled in from the usual week and still needs saving */
+    showPrefillNotice() {
+      return Boolean(
+        this.isEditing && this.scheduleOverlapComponent?.usualWeekApplied
+      )
     },
     canEdit() {
       return (
@@ -679,6 +715,33 @@ export default {
       } else {
         this.choiceDialog = true
       }
+    },
+    /**
+      Opens a poll the user hasn't answered straight into editing, filled in from their usual week,
+      so they only need to check it and press Save. Not for polls they created, or ones they've answered.
+    */
+    maybeOpenPrefilled() {
+      const so = this.scheduleOverlapComponent
+      if (this.autoPrefillChecked || !so || !this.event) return
+      this.autoPrefillChecked = true
+
+      const isOwner = this.authUser && this.authUser._id === this.event.ownerId
+      const alreadyResponded = this.authUser
+        ? this.userHasResponded
+        : so.guestAddedAvailability
+      const viewing = [so.states.HEATMAP, so.states.BEST_TIMES].includes(
+        so.state
+      )
+      if (
+        !this.usualWeek ||
+        !so.canUseUsualWeek ||
+        isOwner ||
+        alreadyResponded ||
+        !viewing
+      ) {
+        return
+      }
+      this.addAvailability()
     },
     /** Add guest availability while signed in */
     addAvailabilityAsGuest() {
@@ -1203,6 +1266,7 @@ export default {
     },
 
     handleGuestDialogSubmit(guestPayload) {
+      saveGuestProfile(guestPayload)
       this.saveChangesAsGuest(guestPayload)
     },
 
@@ -1908,6 +1972,7 @@ export default {
     this.loading = true
     Promise.allSettled(promises).then(() => {
       this.loading = false
+      this.$nextTick(() => this.maybeOpenPrefilled())
     })
 
     get("/user/profile")
@@ -1948,6 +2013,9 @@ export default {
         if (this.isGroup && !this.userHasResponded) {
           this.invitationDialog = true
         }
+
+        // If the poll finished loading before the grid was ready
+        if (!this.loading) this.$nextTick(() => this.maybeOpenPrefilled())
       }
     },
     weekOffset() {
