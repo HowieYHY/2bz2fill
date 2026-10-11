@@ -54,12 +54,23 @@ of responding.
     working hours still block time inside your usual free hours.
   - Your usual week is never shown to other people on a poll, only the availability you submit.
 
+- **Fast manual tools** while filling in a poll (date and days-of-the-week polls):
+  - A **Busy** brush next to Available and If needed. "Mark everything available" switches to it,
+    so you can mark the times you're busy instead of the times you're free.
+  - Click a day's name for **Mark day available**, **Mark day if needed**, **Clear day**, **Copy to
+    all days** and **Copy to weekdays** (copies row by row, so the same times of day).
+  - **Clear all**, and an **Undo** for the last quick fill (until you next drag on the grid).
+  - **Reuse my answers from "…"**: copies your last response to another poll onto this one,
+    wherever that poll asked about the same weekday and time; times it didn't ask about are left
+    alone. Signed in, it uses the latest response on your account (`GET /user/last-response`);
+    signed out, a copy of your last submitted response kept in this browser.
+  - Run `server/scripts/20261012_event_responses_user_index` once on an existing database: it adds
+    the index the account lookup (and the home page's event list) uses.
+
 ### Planned, in order
 
-1. Fast manual tools: mark busy times instead of free ones, fill or clear a whole day, copy a day,
-   reuse your last response.
-2. Pre-filled responses you only need to check and confirm.
-3. A grid that works well on a phone.
+1. Pre-filled responses you only need to check and confirm.
+2. A grid that works well on a phone.
 
 The Timeful-specific parts (their branding, blog, socials, analytics, donation links and the
 When2meet converter, which runs on Timeful's own servers) have been removed.

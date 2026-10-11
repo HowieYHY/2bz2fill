@@ -1641,6 +1641,60 @@ paths:
       summary: Update a folder's name or color
       tags:
       - folders
+  /user/last-response:
+    get:
+      description: Returns the availability from the user's most recent poll response,
+        with the dates and times that poll covered, so it can be copied onto another
+        poll. Skips groups, sign-up forms, days-only polls and empty responses. Returns
+        {} if there is none.
+      parameters:
+      - description: Long ID of a poll to skip (the one being filled in)
+        in: query
+        name: excludeEventId
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              availability:
+                items:
+                  type: string
+                type: array
+              event:
+                properties:
+                  _id:
+                    type: string
+                  dates:
+                    items:
+                      type: string
+                    type: array
+                  duration:
+                    type: number
+                  hasSpecificTimes:
+                    type: boolean
+                  name:
+                    type: string
+                  timeIncrement:
+                    type: integer
+                  times:
+                    items:
+                      type: string
+                    type: array
+                  type:
+                    type: string
+                type: object
+              ifNeeded:
+                items:
+                  type: string
+                type: array
+            type: object
+      summary: Gets the user's most recent response that can be reused on another
+        poll
+      tags:
+      - user
   /user/name:
     patch:
       consumes:

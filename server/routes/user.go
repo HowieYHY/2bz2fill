@@ -34,6 +34,7 @@ func InitUser(router *gin.RouterGroup) {
 	userRouter.PATCH("/calendar-options", updateCalendarOptions)
 	userRouter.PUT("/usual-week", updateUsualWeek)
 	userRouter.DELETE("/usual-week", deleteUsualWeek)
+	userRouter.GET("/last-response", getLastResponse)
 	userRouter.GET("/events", getEvents)
 	userRouter.POST("/events/:eventId/set-folder", setEventFolder)
 	userRouter.GET("/calendars", getCalendars)
@@ -186,6 +187,67 @@ func deleteUsualWeek(c *gin.Context) {
 	})
 	if err != nil {
 		logger.StdErr.Panicln(err)
+	}
+
+	c.JSON(http.StatusOK, gin.H{})
+}
+
+// lastResponseCandidates caps how many of the user's most recent responses are checked for one that can be reused
+const lastResponseCandidates = 10
+
+// @Summary Gets the user's most recent response that can be reused on another poll
+// @Description Returns the availability from the user's most recent poll response, with the dates and times that poll covered, so it can be copied onto another poll. Skips groups, sign-up forms, days-only polls and empty responses. Returns {} if there is none.
+// @Tags user
+// @Produce json
+// @Param excludeEventId query string false "Long ID of a poll to skip (the one being filled in)"
+// @Success 200 {object} object{event=object{_id=string,name=string,type=string,dates=[]string,duration=number,timeIncrement=int,hasSpecificTimes=bool,times=[]string},availability=[]string,ifNeeded=[]string}
+// @Router /user/last-response [get]
+func getLastResponse(c *gin.Context) {
+	authUser := utils.GetAuthUser(c)
+
+	filter := bson.M{"userId": authUser.Id.Hex()}
+	if excludeId, err := primitive.ObjectIDFromHex(c.Query("excludeEventId")); err == nil {
+		filter["eventId"] = bson.M{"$ne": excludeId}
+	}
+	opts := options.Find().SetSort(bson.M{"_id": -1}).SetLimit(lastResponseCandidates)
+	cursor, err := db.EventResponsesCollection.Find(context.Background(), filter, opts)
+	if err != nil {
+		logger.StdErr.Panicln(err)
+	}
+	var eventResponses []models.EventResponse
+	if err := cursor.All(context.Background(), &eventResponses); err != nil {
+		logger.StdErr.Panicln(err)
+	}
+
+	for _, eventResponse := range eventResponses {
+		response := eventResponse.Response
+		if response == nil || len(response.Availability)+len(response.IfNeeded) == 0 {
+			continue
+		}
+		event := db.GetEventById(eventResponse.EventId.Hex())
+		if event == nil ||
+			utils.Coalesce(event.IsDeleted) ||
+			event.Type == models.GROUP ||
+			utils.Coalesce(event.IsSignUpForm) ||
+			utils.Coalesce(event.DaysOnly) {
+			continue
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"event": gin.H{
+				"_id":              event.Id,
+				"name":             event.Name,
+				"type":             event.Type,
+				"dates":            event.Dates,
+				"duration":         event.Duration,
+				"timeIncrement":    event.TimeIncrement,
+				"hasSpecificTimes": event.HasSpecificTimes,
+				"times":            event.Times,
+			},
+			"availability": response.Availability,
+			"ifNeeded":     response.IfNeeded,
+		})
+		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{})

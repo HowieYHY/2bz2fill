@@ -62,7 +62,8 @@
       >
         <AvailabilityTypeToggle
           v-model="availabilityType"
-          class="tw-w-full sm:tw-w-72"
+          showBusy
+          class="tw-w-full sm:tw-w-80"
         />
         <div class="tw-flex tw-items-center tw-gap-4 tw-text-xs tw-text-very-dark-gray">
           <span class="tw-flex tw-items-center tw-gap-1.5">
@@ -85,7 +86,10 @@
         <div
           class="tw-flex tw-flex-wrap tw-items-center tw-justify-between tw-gap-x-4 tw-gap-y-1 tw-text-xs tw-text-dark-gray"
         >
-          <span>Drag across the grid to mark times. Drag over marked times to clear them.</span>
+          <span
+            >Drag across the grid to mark times. Drag over marked times, or use
+            Busy, to clear them.</span
+          >
           <button
             v-if="gridEmpty"
             type="button"

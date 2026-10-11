@@ -36,6 +36,7 @@ export const eventTypes = Object.freeze({
 export const availabilityTypes = Object.freeze({
   AVAILABLE: "available",
   IF_NEEDED: "if_needed",
+  BUSY: "busy", // Paint brush only: marks times as unavailable
 })
 
 export const timeTypes = Object.freeze({
