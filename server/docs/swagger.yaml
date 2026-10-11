@@ -280,7 +280,6 @@ definitions:
       manualAvailability:
         additionalProperties:
           items:
-            format: int64
             type: integer
           type: array
         description: Mapping from the start date of a day to the available times for
@@ -371,6 +370,37 @@ definitions:
           with
         type: string
       timezoneOffset:
+        type: integer
+      usualWeek:
+        allOf:
+        - $ref: '#/definitions/models.UsualWeek'
+        description: The times the user is usually free, used to pre-fill new polls
+    type: object
+  models.UsualWeek:
+    properties:
+      days:
+        items:
+          $ref: '#/definitions/models.UsualWeekDay'
+        type: array
+      timezone:
+        type: string
+    type: object
+  models.UsualWeekDay:
+    properties:
+      available:
+        items:
+          $ref: '#/definitions/models.UsualWeekRange'
+        type: array
+      ifNeeded:
+        items:
+          $ref: '#/definitions/models.UsualWeekRange'
+        type: array
+    type: object
+  models.UsualWeekRange:
+    properties:
+      end:
+        type: integer
+      start:
         type: integer
     type: object
   models.WorkingHoursOptions:
@@ -764,7 +794,6 @@ paths:
             daysOnly:
               type: boolean
             duration:
-              format: float32
               type: number
             isSignUpForm:
               type: boolean
@@ -863,7 +892,6 @@ paths:
             description:
               type: string
             duration:
-              format: float32
               type: number
             name:
               type: string
@@ -1745,6 +1773,34 @@ paths:
           description: OK
       summary: Toggles whether the specified sub-calendar is enabled or disabled for
         the user
+      tags:
+      - user
+  /user/usual-week:
+    delete:
+      responses:
+        "200":
+          description: OK
+      summary: Deletes the user's usual week
+      tags:
+      - user
+    put:
+      consumes:
+      - application/json
+      description: Replaces the user's usual week, which pre-fills new polls. Days[0]
+        is Sunday; times are minutes since local midnight in the given timezone.
+      parameters:
+      - description: The usual week
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/models.UsualWeek'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+      summary: Saves the times the user is usually free
       tags:
       - user
   /users/{userId}:

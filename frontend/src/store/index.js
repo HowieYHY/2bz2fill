@@ -8,6 +8,12 @@ import {
   updateFolder,
 } from "../utils/services/FolderService"
 import { archiveEvent } from "../utils/services/EventService"
+import {
+  deleteUsualWeek,
+  getUsualWeek,
+  loadLocalUsualWeek,
+  saveUsualWeek,
+} from "../utils/usual_week_utils"
 
 Vue.use(Vuex)
 
@@ -17,6 +23,9 @@ export default new Vuex.Store({
     info: "",
 
     authUser: null,
+
+    // Usual week saved in this browser (used when signed out, or before the account has one)
+    localUsualWeek: loadLocalUsualWeek(),
 
     events: [],
     folders: [],
@@ -38,7 +47,14 @@ export default new Vuex.Store({
       folderId: null,
     },
   },
-  getters: {},
+  getters: {
+    /** The usual week used to pre-fill polls, or null if there is none */
+    usualWeek(state) {
+      // Read localUsualWeek so the getter updates when it changes; getUsualWeek reads localStorage itself
+      state.localUsualWeek
+      return getUsualWeek(state.authUser)
+    },
+  },
   mutations: {
     setError(state, error) {
       state.error = error
@@ -49,6 +65,9 @@ export default new Vuex.Store({
 
     setAuthUser(state, authUser) {
       state.authUser = authUser
+    },
+    setLocalUsualWeek(state, usualWeek) {
+      state.localUsualWeek = usualWeek
     },
 
     setEvents(state, events) {
@@ -119,6 +138,18 @@ export default new Vuex.Store({
     },
   },
   actions: {
+    /** Saves the usual week to the account if signed in, otherwise to this browser */
+    async saveUsualWeek({ commit, state }, usualWeek) {
+      const authUser = await saveUsualWeek(state.authUser, usualWeek)
+      if (authUser) commit("setAuthUser", authUser)
+      commit("setLocalUsualWeek", loadLocalUsualWeek())
+    },
+    async deleteUsualWeek({ commit, state }) {
+      const authUser = await deleteUsualWeek(state.authUser)
+      if (authUser) commit("setAuthUser", authUser)
+      commit("setLocalUsualWeek", null)
+    },
+
     // Error & info
     showError({ commit }, error) {
       commit("setError", "")

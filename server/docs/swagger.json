@@ -567,8 +567,7 @@
                                     "type": "boolean"
                                 },
                                 "duration": {
-                                    "type": "number",
-                                    "format": "float32"
+                                    "type": "number"
                                 },
                                 "isSignUpForm": {
                                     "type": "boolean"
@@ -741,8 +740,7 @@
                                     "type": "string"
                                 },
                                 "duration": {
-                                    "type": "number",
-                                    "format": "float32"
+                                    "type": "number"
                                 },
                                 "name": {
                                     "type": "string"
@@ -2075,6 +2073,48 @@
                 }
             }
         },
+        "/user/usual-week": {
+            "put": {
+                "description": "Replaces the user's usual week, which pre-fills new polls. Days[0] is Sunday; times are minutes since local midnight in the given timezone.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "user"
+                ],
+                "summary": "Saves the times the user is usually free",
+                "parameters": [
+                    {
+                        "description": "The usual week",
+                        "name": "payload",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.UsualWeek"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    }
+                }
+            },
+            "delete": {
+                "tags": [
+                    "user"
+                ],
+                "summary": "Deletes the user's usual week",
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    }
+                }
+            }
+        },
         "/users/{userId}": {
             "get": {
                 "produces": [
@@ -2517,8 +2557,7 @@
                     "additionalProperties": {
                         "type": "array",
                         "items": {
-                            "type": "integer",
-                            "format": "int64"
+                            "type": "integer"
                         }
                     }
                 },
@@ -2642,6 +2681,56 @@
                     "type": "string"
                 },
                 "timezoneOffset": {
+                    "type": "integer"
+                },
+                "usualWeek": {
+                    "description": "The times the user is usually free, used to pre-fill new polls",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/models.UsualWeek"
+                        }
+                    ]
+                }
+            }
+        },
+        "models.UsualWeek": {
+            "type": "object",
+            "properties": {
+                "days": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.UsualWeekDay"
+                    }
+                },
+                "timezone": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.UsualWeekDay": {
+            "type": "object",
+            "properties": {
+                "available": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.UsualWeekRange"
+                    }
+                },
+                "ifNeeded": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.UsualWeekRange"
+                    }
+                }
+            }
+        },
+        "models.UsualWeekRange": {
+            "type": "object",
+            "properties": {
+                "end": {
+                    "type": "integer"
+                },
+                "start": {
                     "type": "integer"
                 }
             }

@@ -33,6 +33,9 @@ type User struct {
 	// Calendar options
 	CalendarOptions *CalendarOptions `json:"calendarOptions" bson:"calendarOptions,omitempty"`
 
+	// The times the user is usually free, used to pre-fill new polls
+	UsualWeek *UsualWeek `json:"usualWeek,omitempty" bson:"usualWeek,omitempty"`
+
 	NumEventsCreated int `json:"numEventsCreated" bson:"numEventsCreated,omitempty"`
 
 	// Billing customer IDs from when Timeful had a paid tier. Kept so we can

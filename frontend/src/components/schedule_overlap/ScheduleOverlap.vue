@@ -699,6 +699,25 @@
                     >
                   </div>
                 </div>
+                <!-- Pre-filled from the usual week -->
+                <div
+                  v-if="usualWeekApplied && state === states.EDIT_AVAILABILITY"
+                  class="tw-flex tw-items-start tw-gap-1 tw-text-xs tw-text-dark-gray"
+                >
+                  <v-icon x-small color="#6B6B6B" class="tw-mt-px"
+                    >mdi-calendar-week</v-icon
+                  >
+                  <span>
+                    Pre-filled from your usual week ·
+                    <a
+                      href="/usual-week"
+                      target="_blank"
+                      rel="noopener"
+                      class="tw-text-dark-gray tw-underline"
+                      >Edit</a
+                    >
+                  </span>
+                </div>
                 <!-- User's calendar accounts -->
                 <CalendarAccounts
                   v-if="
@@ -1085,7 +1104,12 @@ import {
   timeTypes,
   timeslotDurations,
 } from "@/constants"
-import { mapMutations, mapActions, mapState } from "vuex"
+import { mapMutations, mapActions, mapState, mapGetters } from "vuex"
+import {
+  getUsualWeekStatus,
+  usualWeekStatuses,
+  usualWeekToMinutes,
+} from "@/utils/usual_week_utils"
 import UserAvatarContent from "@/components/UserAvatarContent.vue"
 import CalendarAccounts from "@/components/settings/CalendarAccounts.vue"
 import SignUpBlock from "@/components/sign_up_form/SignUpBlock.vue"
@@ -1220,6 +1244,8 @@ export default {
       /* Variables for options */
       curTimezone: this.initialTimezone,
 
+      usualWeekApplied: false, // Whether the current edits were pre-filled from the user's usual week
+
       /* Uploaded .ics file (never sent to the server) */
       uploadedCalendarEvents: [], // Events in the same shape as calendar events from the server
       icsUploadDialog: false,
@@ -1278,6 +1304,23 @@ export default {
   },
   computed: {
     ...mapState(["authUser", "overlayAvailabilitiesEnabled"]),
+    ...mapGetters(["usualWeek"]),
+    /** Whether the usual week should pre-fill this response (not for groups, sign-ups, days-only polls, or someone else's response) */
+    canUseUsualWeek() {
+      return (
+        !this.isGroup &&
+        !this.isSignUp &&
+        !this.event.daysOnly &&
+        !this.addingAvailabilityAsGuest &&
+        !this.curGuestId
+      )
+    },
+    /** Options for reading the usual week: days-of-the-week polls use placeholder dates shown with a fixed offset */
+    usualWeekOptions() {
+      return this.event.type === eventTypes.DOW
+        ? { utcOffsetMinutes: -this.timezoneOffset }
+        : {}
+    },
     /** Returns the width of the right side of the calendar */
     rightSideWidth() {
       if (this.isPhone) return "100%"
@@ -2695,8 +2738,11 @@ export default {
       fetchedManualAvailability = {}, // Object mapping unix timestamp to array of manual availability (fetched from server)
       curManualAvailability = {}, // Manual availability with edits (takes precedence over fetchedManualAvailability)
       calendarOptions = calendarOptionsDefaults, // User id of the user we are getting availability for
+      usualWeek = null, // Only times free in the usual week are filled; its "if needed" times go into ifNeeded
+      ifNeeded = null, // Set to add if needed times to (when usualWeek is given)
     }) {
       const availability = new Set()
+      const usualWeekMinutes = usualWeek ? usualWeekToMinutes(usualWeek) : null
 
       for (let i = 0; i < this.allDays.length; ++i) {
         const day = this.allDays[i]
@@ -2778,8 +2824,25 @@ export default {
             }
           }
 
-          // Check if there exists a calendar event that overlaps [startDate, endDate]
-          const index = calendarEventsByDay[i]?.findIndex((e) => {
+          // Usual week
+          let usualWeekStatus = usualWeekStatuses.AVAILABLE
+          if (usualWeek) {
+            usualWeekStatus = getUsualWeekStatus(
+              usualWeekMinutes,
+              usualWeek.timezone,
+              startDate,
+              this.timeslotDuration,
+              this.usualWeekOptions
+            )
+            if (usualWeekStatus === usualWeekStatuses.BUSY) continue
+          }
+
+          // Check if there exists a calendar event that overlaps [startDate, endDate].
+          // With no calendar events for this day, the slot is free only if the usual week says so
+          // (without a usual week, nothing is known about the day, so it isn't filled)
+          const index = (
+            calendarEventsByDay[i] ?? (usualWeek ? [] : undefined)
+          )?.findIndex((e) => {
             const startDateBuffered = new Date(
               e.startDate.getTime() - bufferTimeInMS
             )
@@ -2793,7 +2856,11 @@ export default {
             return !notIntersect && !e.free
           })
           if (index === -1) {
-            availability.add(startDate.getTime())
+            if (usualWeekStatus === usualWeekStatuses.IF_NEEDED) {
+              ifNeeded?.add(startDate.getTime())
+            } else {
+              availability.add(startDate.getTime())
+            }
           }
         }
       }
@@ -2803,13 +2870,19 @@ export default {
     setAvailabilityAutomatically() {
       // This is not a computed property because we should be able to change it manually from what it automatically fills in
       this.availability = new Set()
+      const usualWeek = this.canUseUsualWeek ? this.usualWeek : null
+      const tmpIfNeeded = new Set()
       const tmpAvailability = this.getAvailabilityFromCalendarEvents({
         calendarEventsByDay: this.calendarEventsByDay,
         calendarOptions: {
           bufferTime: this.bufferTime,
           workingHours: this.workingHours,
         },
+        usualWeek,
+        ifNeeded: tmpIfNeeded,
       })
+      this.usualWeekApplied = Boolean(usualWeek)
+      if (usualWeek) this.ifNeeded = tmpIfNeeded
 
       const pageStartDate = getDateDayOffset(
         new Date(this.event.dates[0]),
@@ -2869,6 +2942,34 @@ export default {
         clearTimeout(timeout)
       }
       this.availabilityAnimEnabled = false
+    },
+    /**
+      Returns the current availability as slots for updating the usual week:
+      { slots: [{ startDate, durationMinutes, status }], options, timezone } (see mergeSlotsIntoUsualWeek)
+    */
+    getUsualWeekSlots() {
+      const slots = []
+      for (let i = 0; i < this.allDays.length; ++i) {
+        for (let j = 0; j < this.times.length; ++j) {
+          const startDate = this.getDateFromDayTimeIndex(i, j)
+          if (!startDate) continue
+          const time = startDate.getTime()
+          slots.push({
+            startDate,
+            durationMinutes: this.timeslotDuration,
+            status: this.availability.has(time)
+              ? usualWeekStatuses.AVAILABLE
+              : this.ifNeeded.has(time)
+              ? usualWeekStatuses.IF_NEEDED
+              : usualWeekStatuses.BUSY,
+          })
+        }
+      }
+      return {
+        slots,
+        options: this.usualWeekOptions,
+        timezone: this.curTimezone?.value, // The times the user sees
+      }
     },
     /** Opens the dialog to autofill availability from an .ics file */
     openIcsUpload() {
@@ -3531,6 +3632,7 @@ export default {
       this.availabilityType = availabilityTypes.AVAILABLE
       this.availability = new Set()
       this.ifNeeded = new Set()
+      this.usualWeekApplied = false
 
       if (this.authUser && !this.addingAvailabilityAsGuest) {
         this.resetCurUserAvailability()
