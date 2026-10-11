@@ -1,5 +1,18 @@
 <template>
   <span>
+    <!-- Autofill from an uploaded .ics file -->
+    <v-dialog v-model="icsUploadDialog" width="400" content-class="tw-m-0">
+      <v-card class="tw-p-4 sm:tw-p-6">
+        <ICSUpload
+          :event="event"
+          :weekOffset="weekOffset"
+          :timezone="curTimezone.value"
+          @uploaded="setUploadedCalendarEvents"
+          @cancel="icsUploadDialog = false"
+        />
+      </v-card>
+    </v-dialog>
+
     <Tooltip :content="tooltipContent">
       <div class="tw-select-none tw-py-4" style="-webkit-touch-callout: none">
         <div class="tw-flex tw-flex-col sm:tw-flex-row">
@@ -655,6 +668,37 @@
                   />
                   <ColorLegend />
                 </div>
+                <!-- Autofill from an uploaded .ics file -->
+                <div
+                  v-if="!event.daysOnly && !isGroup"
+                  class="tw-flex tw-flex-col tw-gap-1"
+                >
+                  <div
+                    id="ics-upload-btn"
+                    class="tw-flex tw-w-fit tw-cursor-pointer tw-items-center tw-gap-1 tw-text-sm tw-text-green hover:tw-underline"
+                    @click="openIcsUpload"
+                  >
+                    <v-icon small color="#00994C">mdi-calendar-import</v-icon>
+                    {{
+                      uploadedCalendarEvents.length > 0
+                        ? "Upload a different .ics file"
+                        : "Autofill from a .ics file"
+                    }}
+                  </div>
+                  <div
+                    v-if="uploadedCalendarEvents.length > 0"
+                    class="tw-text-xs tw-text-dark-gray"
+                  >
+                    Using {{ uploadedCalendarEvents.length }}
+                    {{ uploadedCalendarEvents.length === 1 ? "event" : "events" }}
+                    from your file ·
+                    <span
+                      class="tw-cursor-pointer tw-underline"
+                      @click="clearUploadedCalendarEvents"
+                      >Remove</span
+                    >
+                  </div>
+                </div>
                 <!-- User's calendar accounts -->
                 <CalendarAccounts
                   v-if="
@@ -1065,6 +1109,7 @@ import timezonePlugin from "dayjs/plugin/timezone"
 import AvailabilityTypeToggle from "./AvailabilityTypeToggle.vue"
 import BufferTimeSwitch from "./BufferTimeSwitch.vue"
 import CalendarEventBlock from "./CalendarEventBlock.vue" // Added import
+import ICSUpload from "@/components/calendar_permission_dialogs/ICSUpload.vue"
 import SpecificTimesInstructions from "./SpecificTimesInstructions.vue"
 dayjs.extend(utcPlugin)
 dayjs.extend(timezonePlugin)
@@ -1174,6 +1219,10 @@ export default {
 
       /* Variables for options */
       curTimezone: this.initialTimezone,
+
+      /* Uploaded .ics file (never sent to the server) */
+      uploadedCalendarEvents: [], // Events in the same shape as calendar events from the server
+      icsUploadDialog: false,
       curScheduledEvent: null, // The scheduled event represented in the form {hoursOffset, hoursLength, dayIndex}
       timeType:
         localStorage["timeType"] ??
@@ -1268,13 +1317,18 @@ export default {
       // If this is an example calendar
       if (this.sampleCalendarEventsByDay) return this.sampleCalendarEventsByDay
 
-      // If the user isn't logged in or is adding availability as a guest
-      if (!this.authUser || this.addingAvailabilityAsGuest) return []
-
-      let events = []
+      // Events from an uploaded .ics file (kept on this device only), also used by guests
+      let events = this.isGroup ? [] : [...this.uploadedCalendarEvents]
       let event
 
-      const calendarAccounts = this.isGroup
+      // Calendar accounts are only used if the user is logged in and not adding availability as a guest
+      const useCalendarAccounts =
+        this.authUser && !this.addingAvailabilityAsGuest
+      if (!useCalendarAccounts && events.length === 0) return []
+
+      const calendarAccounts = !useCalendarAccounts
+        ? {}
+        : this.isGroup
         ? this.sharedCalendarAccounts
         : this.authUser.calendarAccounts
 
@@ -2815,6 +2869,24 @@ export default {
         clearTimeout(timeout)
       }
       this.availabilityAnimEnabled = false
+    },
+    /** Opens the dialog to autofill availability from an .ics file */
+    openIcsUpload() {
+      this.icsUploadDialog = true
+    },
+    /** Autofills availability using events read from an uploaded .ics file */
+    setUploadedCalendarEvents(events) {
+      this.icsUploadDialog = false
+      if (this.state !== this.states.EDIT_AVAILABILITY) this.startEditing()
+      this.uploadedCalendarEvents = events
+      this.$nextTick(() => {
+        this.stopAvailabilityAnim()
+        this.setAvailabilityAutomatically()
+      })
+    },
+    /** Removes the uploaded .ics events. Availability is left as is so manual edits aren't lost */
+    clearUploadedCalendarEvents() {
+      this.uploadedCalendarEvents = []
     },
     async submitAvailability(guestPayload = { name: "", email: "" }) {
       let payload = {}
@@ -4623,6 +4695,7 @@ export default {
     SignUpBlocksList,
     CalendarEventBlock, // Added component registration
     SpecificTimesInstructions, // Added component registration
+    ICSUpload,
     Tooltip,
   },
 }

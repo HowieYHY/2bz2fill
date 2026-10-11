@@ -611,6 +611,28 @@ export const getCalendarEventsMap = async (
   event,
   { weekOffset = 0, eventId = "" }
 ) => {
+  const { timeMin, timeMax } = getCalendarEventsTimeRange(event, weekOffset)
+
+  // Fetch calendar events from Google Calendar
+  let calendarEventsMap
+  if (eventId.length === 0) {
+    calendarEventsMap = await get(
+      `/user/calendars?timeMin=${timeMin}&timeMax=${timeMax}`
+    )
+  } else {
+    calendarEventsMap = await get(
+      `/events/${eventId}/calendar-availabilities?timeMin=${timeMin}&timeMax=${timeMax}`
+    )
+  }
+
+  return calendarEventsMap
+}
+
+/**
+  Returns the { timeMin, timeMax } ISO strings to fetch calendar events between for the given event.
+  weekOffset is only used for weekly events
+*/
+export const getCalendarEventsTimeRange = (event, weekOffset = 0) => {
   let timeMin, timeMax
   if (event.type === eventTypes.SPECIFIC_DATES) {
     // Get all calendar events between the first date and the last date in dates
@@ -638,20 +660,7 @@ export const getCalendarEventsMap = async (
     timeMin = getDateDayOffset(firstDate, -2).toISOString()
     timeMax = getDateDayOffset(lastDate, 2).toISOString()
   }
-
-  // Fetch calendar events from Google Calendar
-  let calendarEventsMap
-  if (eventId.length === 0) {
-    calendarEventsMap = await get(
-      `/user/calendars?timeMin=${timeMin}&timeMax=${timeMax}`
-    )
-  } else {
-    calendarEventsMap = await get(
-      `/events/${eventId}/calendar-availabilities?timeMin=${timeMin}&timeMax=${timeMax}`
-    )
-  }
-
-  return calendarEventsMap
+  return { timeMin, timeMax }
 }
 
 /**
