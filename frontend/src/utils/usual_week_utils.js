@@ -127,6 +127,25 @@ export const getUsualWeekStatus = (
   timezone,
   startDate,
   durationMinutes,
+  options = {}
+) =>
+  getTemplateStatus(
+    { weekMinutes, covered: null },
+    timezone,
+    startDate,
+    durationMinutes,
+    options
+  )
+
+/**
+  Like getUsualWeekStatus for a template made by slotsToTemplate, which only knows some of the week:
+  returns null if any minute of the slot isn't covered.
+*/
+export const getTemplateStatus = (
+  { weekMinutes, covered },
+  timezone,
+  startDate,
+  durationMinutes,
   { utcOffsetMinutes } = {}
 ) => {
   let { weekday, minute } = getLocalDayMinute(
@@ -136,6 +155,7 @@ export const getUsualWeekStatus = (
   )
   let status = usualWeekStatuses.AVAILABLE
   for (let i = 0; i < durationMinutes; ++i) {
+    if (covered && !covered[weekday][minute]) return null
     const s = weekMinutes[weekday][minute]
     if (s === usualWeekStatuses.BUSY) return usualWeekStatuses.BUSY
     if (s === usualWeekStatuses.IF_NEEDED) status = usualWeekStatuses.IF_NEEDED
@@ -153,14 +173,32 @@ export const getUsualWeekStatus = (
   If the poll covers the same weekday more than once, the earliest date wins so a two-week poll
   doesn't mix its weeks together.
 */
-export const mergeSlotsIntoUsualWeek = (
-  usualWeek,
-  slots,
-  { utcOffsetMinutes } = {}
-) => {
+export const mergeSlotsIntoUsualWeek = (usualWeek, slots, options = {}) => {
   const { timezone } = usualWeek
   const weekMinutes = usualWeekToMinutes(usualWeek)
+  writeSlots(weekMinutes, null, slots, timezone, options)
+  return minutesToUsualWeek(weekMinutes, timezone)
+}
 
+/**
+  Returns a template of one poll response: { weekMinutes, covered }, where covered marks the
+  weekday minutes the poll asked about. Read it with getTemplateStatus.
+*/
+export const slotsToTemplate = (slots, timezone, options = {}) => {
+  const weekMinutes = Array.from({ length: 7 }, () => new Uint8Array(MINUTES_PER_DAY))
+  const covered = Array.from({ length: 7 }, () => new Uint8Array(MINUTES_PER_DAY))
+  writeSlots(weekMinutes, covered, slots, timezone, options)
+  return { weekMinutes, covered }
+}
+
+/** Writes slot statuses into per-minute weekdays (and marks them covered), earliest date per weekday winning */
+const writeSlots = (
+  weekMinutes,
+  covered,
+  slots,
+  timezone,
+  { utcOffsetMinutes } = {}
+) => {
   // Find the first local date seen for each weekday
   const dateForWeekday = {}
   const located = slots.map((slot) => {
@@ -180,9 +218,8 @@ export const mergeSlotsIntoUsualWeek = (
     if (dateForWeekday[slot.weekday] !== slot.dateKey) continue
     const end = Math.min(slot.minute + slot.durationMinutes, MINUTES_PER_DAY)
     weekMinutes[slot.weekday].fill(slot.status, slot.minute, end)
+    covered?.[slot.weekday].fill(1, slot.minute, end)
   }
-
-  return minutesToUsualWeek(weekMinutes, timezone)
 }
 
 // ---------------------------------------------------------------------------

@@ -131,9 +131,10 @@ export default {
       })
     },
     paintStatus() {
-      return this.availabilityType === availabilityTypes.IF_NEEDED
-        ? usualWeekStatuses.IF_NEEDED
-        : usualWeekStatuses.AVAILABLE
+      return {
+        [availabilityTypes.IF_NEEDED]: usualWeekStatuses.IF_NEEDED,
+        [availabilityTypes.BUSY]: usualWeekStatuses.BUSY,
+      }[this.availabilityType] ?? usualWeekStatuses.AVAILABLE
     },
   },
 

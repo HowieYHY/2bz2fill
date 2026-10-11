@@ -13,10 +13,11 @@
     ></div>
     <template v-for="(tab, i) in options">
       <div
-        class="tw-flex tw-flex-1 tw-cursor-pointer tw-items-center tw-justify-center tw-gap-1.5 tw-overflow-hidden tw-px-4 tw-py-2.5 tw-text-center tw-text-sm tw-font-medium tw-transition-all"
-        :class="
-          i === index ? tab.activeClass ?? defaultActiveClass : inactiveClass
-        "
+        class="tw-flex tw-flex-1 tw-cursor-pointer tw-items-center tw-justify-center tw-gap-1.5 tw-overflow-hidden tw-py-2.5 tw-text-center tw-font-medium tw-transition-all"
+        :class="[
+          i === index ? tab.activeClass ?? defaultActiveClass : inactiveClass,
+          compact ? 'tw-px-1 tw-text-xs' : 'tw-px-4 tw-text-sm',
+        ]"
         :style="tab.style || {}"
         @click="$emit('input', tab.value)"
       >
@@ -44,6 +45,9 @@ export default {
     //   value: String,
     // }
     options: { type: Array, required: true },
+
+    // Less padding and smaller text, so more options fit in a narrow space
+    compact: { type: Boolean, default: false },
   },
 
   data() {

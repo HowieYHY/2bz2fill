@@ -213,7 +213,69 @@
                         :key="`${i}-gap`"
                       ></div>
                       <div :key="i" class="tw-flex-1 tw-bg-white">
-                        <div class="tw-text-center">
+                        <!-- While editing, a day's name opens fill / clear / copy actions -->
+                        <v-menu
+                          v-if="canQuickEdit && state === states.EDIT_AVAILABILITY"
+                          offset-y
+                          bottom
+                        >
+                          <template v-slot:activator="{ on, attrs }">
+                            <button
+                              type="button"
+                              v-bind="attrs"
+                              v-on="on"
+                              class="tw-group tw-w-full tw-rounded-md tw-py-0.5 tw-text-center tw-transition-colors hover:tw-bg-light-gray focus-visible:tw-bg-light-gray focus-visible:tw-outline-none"
+                              :aria-label="`Fill, clear or copy ${day.dayText} ${day.dateString ?? ''}`"
+                            >
+                              <div
+                                v-if="isSpecificDates || isGroup"
+                                class="tw-text-[12px] tw-font-light tw-capitalize tw-text-very-dark-gray sm:tw-text-xs"
+                              >
+                                {{ day.dateString }}
+                              </div>
+                              <div
+                                class="tw-flex tw-items-center tw-justify-center tw-text-base tw-capitalize sm:tw-text-lg"
+                              >
+                                {{ day.dayText }}
+                                <v-icon
+                                  small
+                                  class="tw-text-dark-gray group-hover:tw-text-black"
+                                  >mdi-chevron-down</v-icon
+                                >
+                              </div>
+                            </button>
+                          </template>
+                          <v-list dense>
+                            <v-list-item
+                              @click="fillColumn(i, availabilityTypes.AVAILABLE)"
+                            >
+                              <v-list-item-title>Mark day available</v-list-item-title>
+                            </v-list-item>
+                            <v-list-item
+                              @click="fillColumn(i, availabilityTypes.IF_NEEDED)"
+                            >
+                              <v-list-item-title>Mark day if needed</v-list-item-title>
+                            </v-list-item>
+                            <v-list-item
+                              @click="fillColumn(i, availabilityTypes.BUSY)"
+                            >
+                              <v-list-item-title>Clear day</v-list-item-title>
+                            </v-list-item>
+                            <template v-if="numColumns > 1">
+                              <v-divider />
+                              <v-list-item @click="copyColumn(i, 'all')">
+                                <v-list-item-title>Copy to all days</v-list-item-title>
+                              </v-list-item>
+                              <v-list-item
+                                v-if="canCopyToWeekdays(i)"
+                                @click="copyColumn(i, 'weekdays')"
+                              >
+                                <v-list-item-title>Copy to weekdays</v-list-item-title>
+                              </v-list-item>
+                            </template>
+                          </v-list>
+                        </v-menu>
+                        <div v-else class="tw-text-center">
                           <div
                             v-if="isSpecificDates || isGroup"
                             class="tw-text-[12px] tw-font-light tw-capitalize tw-text-very-dark-gray sm:tw-text-xs"
@@ -665,8 +727,57 @@
                     v-if="!isGroup && !isPhone"
                     class="tw-w-full"
                     v-model="availabilityType"
+                    showBusy
                   />
                   <ColorLegend />
+                </div>
+                <!-- Quick fill -->
+                <div v-if="canQuickEdit" class="tw-flex tw-flex-col tw-gap-1">
+                  <div class="tw-text-sm tw-font-medium">Quick fill:</div>
+                  <div
+                    class="tw-flex tw-flex-wrap tw-gap-x-3 tw-gap-y-1 tw-text-sm"
+                  >
+                    <button
+                      type="button"
+                      class="tw-text-green hover:tw-underline"
+                      @click="markAllAvailable"
+                    >
+                      Mark everything available
+                    </button>
+                    <button
+                      type="button"
+                      class="tw-text-dark-gray hover:tw-text-black hover:tw-underline"
+                      @click="fillAll(availabilityTypes.BUSY)"
+                    >
+                      Clear all
+                    </button>
+                  </div>
+                  <button
+                    v-if="lastResponse && canUseUsualWeek"
+                    type="button"
+                    class="tw-w-fit tw-text-left tw-text-sm tw-text-green hover:tw-underline"
+                    @click="reuseLastResponse"
+                  >
+                    Reuse my answers from
+                    <span class="tw-font-medium">“{{ lastResponse.eventName }}”</span>
+                  </button>
+                  <div
+                    v-if="lastBulkEdit"
+                    class="tw-text-xs tw-text-very-dark-gray"
+                    role="status"
+                  >
+                    {{ lastBulkEdit.label }} ·
+                    <button
+                      type="button"
+                      class="tw-underline tw-underline-offset-2 hover:tw-text-black"
+                      @click="undoBulkEdit"
+                    >
+                      Undo
+                    </button>
+                  </div>
+                  <div v-else class="tw-text-xs tw-text-dark-gray">
+                    Click a day's name to fill, clear or copy it.
+                  </div>
                 </div>
                 <!-- Autofill from an uploaded .ics file -->
                 <div
@@ -967,6 +1078,7 @@
                 <AvailabilityTypeToggle
                   class="tw-w-full"
                   v-model="availabilityType"
+                  showBusy
                 />
               </div>
             </div>
@@ -1106,10 +1218,14 @@ import {
 } from "@/constants"
 import { mapMutations, mapActions, mapState, mapGetters } from "vuex"
 import {
+  getBrowserTimezone,
+  getTemplateStatus,
   getUsualWeekStatus,
+  slotsToTemplate,
   usualWeekStatuses,
   usualWeekToMinutes,
 } from "@/utils/usual_week_utils"
+import { fetchLastResponse } from "@/utils/last_response_utils"
 import UserAvatarContent from "@/components/UserAvatarContent.vue"
 import CalendarAccounts from "@/components/settings/CalendarAccounts.vue"
 import SignUpBlock from "@/components/sign_up_form/SignUpBlock.vue"
@@ -1245,6 +1361,8 @@ export default {
       curTimezone: this.initialTimezone,
 
       usualWeekApplied: false, // Whether the current edits were pre-filled from the user's usual week
+      lastBulkEdit: null, // { label, availability, ifNeeded } from before the last quick fill, for undo
+      lastResponse: null, // The user's response to another poll, to reuse here (see last_response_utils)
 
       /* Uploaded .ics file (never sent to the server) */
       uploadedCalendarEvents: [], // Events in the same shape as calendar events from the server
@@ -1314,6 +1432,15 @@ export default {
         !this.addingAvailabilityAsGuest &&
         !this.curGuestId
       )
+    },
+    availabilityTypes: () => availabilityTypes,
+    /** Whether the quick fill tools (fill, clear, copy days) are available */
+    canQuickEdit() {
+      return !this.isGroup && !this.isSignUp && !this.event.daysOnly
+    },
+    /** Number of day columns across all pages (an overnight poll has one more column than days) */
+    numColumns() {
+      return this.allDays.length + (this.splitTimes[1].length > 0 ? 1 : 0)
     },
     /** Options for reading the usual week: days-of-the-week polls use placeholder dates shown with a fixed offset */
     usualWeekOptions() {
@@ -2144,6 +2271,9 @@ export default {
             if (this.availabilityType === availabilityTypes.IF_NEEDED) {
               return `Tap and drag to add your "if needed" ${daysOrTimes} in yellow.`
             }
+            if (this.availabilityType === availabilityTypes.BUSY) {
+              return `Tap and drag over the ${daysOrTimes} you're busy.`
+            }
             return `Tap and drag to add your "available" ${daysOrTimes} in green.`
           case this.states.SCHEDULE_EVENT:
             return "Tap and drag on the calendar to schedule a Google Calendar event during those times."
@@ -2159,6 +2289,9 @@ export default {
           const daysOrTimes = this.event.daysOnly ? "days" : "times"
           if (this.availabilityType === availabilityTypes.IF_NEEDED) {
             return `Click and drag to add your "if needed" ${daysOrTimes} in yellow.`
+          }
+          if (this.availabilityType === availabilityTypes.BUSY) {
+            return `Click and drag over the ${daysOrTimes} you're busy.`
           }
           return `Click and drag to add your "available" ${daysOrTimes} in green.`
         case this.states.SCHEDULE_EVENT:
@@ -2943,6 +3076,189 @@ export default {
       }
       this.availabilityAnimEnabled = false
     },
+    //#region Quick fill
+    /** Loads the user's last response to another poll, to offer reusing it */
+    async loadLastResponse() {
+      this.lastResponse = null
+      if (!this.canUseUsualWeek) return
+      const eventId = this.event._id
+      const lastResponse = await fetchLastResponse(
+        this.addingAvailabilityAsGuest ? null : this.authUser,
+        eventId
+      )
+      // Ignore a late result if the poll or editing state changed meanwhile
+      if (
+        this.event._id === eventId &&
+        this.state === this.states.EDIT_AVAILABILITY
+      ) {
+        this.lastResponse = lastResponse
+      }
+    },
+    /** Copies the last response onto this poll, wherever it covered the same weekday and time */
+    reuseLastResponse() {
+      const { eventName, isDow, slots } = this.lastResponse
+      const timezone = this.curTimezone?.value || getBrowserTimezone()
+      // Both polls are read as the times shown in the current timezone
+      const fixedOffset = { utcOffsetMinutes: -this.timezoneOffset }
+      const useFixedOffset = !this.curTimezone?.value
+      const template = slotsToTemplate(
+        slots,
+        timezone,
+        isDow || useFixedOffset ? fixedOffset : {}
+      )
+      const readOptions = useFixedOffset ? fixedOffset : this.usualWeekOptions
+      const toType = {
+        [usualWeekStatuses.AVAILABLE]: availabilityTypes.AVAILABLE,
+        [usualWeekStatuses.IF_NEEDED]: availabilityTypes.IF_NEEDED,
+        [usualWeekStatuses.BUSY]: availabilityTypes.BUSY,
+      }
+
+      const updates = []
+      for (let d = 0; d < this.numColumns; ++d) {
+        for (const date of this.getColumnDates(d)) {
+          if (!date) continue
+          const status = getTemplateStatus(
+            template,
+            timezone,
+            date,
+            this.timeslotDuration,
+            readOptions
+          )
+          if (status !== null) updates.push([date.getTime(), toType[status]])
+        }
+      }
+      if (updates.length === 0) {
+        this.showInfo(
+          `“${eventName}” didn't ask about any of these days and times.`
+        )
+        return
+      }
+      this.bulkEdit(`Copied your answers from “${eventName}”`, () => {
+        for (const [time, type] of updates) this.setSlotType(time, type)
+      })
+    },
+    /** Returns a column's slot dates (null where a row has no slot); dayIndex counts columns across all pages */
+    getColumnDates(dayIndex) {
+      return this.times.map((_, j) => this.getDateFromDayTimeIndex(dayIndex, j))
+    },
+    /** Returns the weekday (0 = Sunday) shown for a column, as seen in the current timezone */
+    getColumnWeekday(dayIndex) {
+      const day = this.allDays[dayIndex] ?? this.allDays[dayIndex - 1]
+      if (!day) return null
+      return dayjs(day.dateObject)
+        .utc()
+        .add(-this.timezoneOffset, "minute")
+        .day()
+    },
+    /** Sets one slot to available, if needed, or busy (neither) */
+    setSlotType(time, type) {
+      this.availability.delete(time)
+      this.ifNeeded.delete(time)
+      if (type === availabilityTypes.AVAILABLE) this.availability.add(time)
+      else if (type === availabilityTypes.IF_NEEDED) this.ifNeeded.add(time)
+    },
+    getSlotType(time) {
+      if (this.availability.has(time)) return availabilityTypes.AVAILABLE
+      if (this.ifNeeded.has(time)) return availabilityTypes.IF_NEEDED
+      return availabilityTypes.BUSY
+    },
+    /** Runs a quick fill edit, keeping the previous availability so it can be undone */
+    bulkEdit(label, edit) {
+      this.stopAvailabilityAnim()
+      const previous = {
+        availability: new Set(this.availability),
+        ifNeeded: new Set(this.ifNeeded),
+      }
+      edit()
+      this.availability = new Set(this.availability)
+      this.ifNeeded = new Set(this.ifNeeded)
+      this.lastBulkEdit = { label, ...previous }
+    },
+    undoBulkEdit() {
+      if (!this.lastBulkEdit) return
+      this.availability = this.lastBulkEdit.availability
+      this.ifNeeded = this.lastBulkEdit.ifNeeded
+      this.lastBulkEdit = null
+    },
+    /** Column on the current page -> column across all pages */
+    pageColumnToDayIndex(col) {
+      return this.maxDaysPerPage * this.page + col
+    },
+    /** Returns a column's name for messages, e.g. "Mon Oct 12" (day names are stored lowercase) */
+    columnLabel(dayIndex) {
+      const day = this.allDays[dayIndex] ?? this.allDays[dayIndex - 1]
+      if (!day) return "day"
+      const label = day.dateString
+        ? `${day.dayText} ${day.dateString}`
+        : day.dayText
+      return label.replace(/\b\w/g, (c) => c.toUpperCase())
+    },
+    fillColumn(col, type) {
+      const dayIndex = this.pageColumnToDayIndex(col)
+      const day = this.columnLabel(dayIndex)
+      const label =
+        type === availabilityTypes.AVAILABLE
+          ? `Marked ${day} available`
+          : type === availabilityTypes.IF_NEEDED
+          ? `Marked ${day} if needed`
+          : `Cleared ${day}`
+      this.bulkEdit(label, () => {
+        for (const date of this.getColumnDates(dayIndex)) {
+          if (date) this.setSlotType(date.getTime(), type)
+        }
+      })
+    },
+    fillAll(type, label = "Cleared all") {
+      this.bulkEdit(label, () => {
+        for (let d = 0; d < this.numColumns; ++d) {
+          for (const date of this.getColumnDates(d)) {
+            if (date) this.setSlotType(date.getTime(), type)
+          }
+        }
+      })
+    },
+    /** Marks everything available and switches to the busy brush, for marking busy times instead of free ones */
+    markAllAvailable() {
+      this.fillAll(
+        availabilityTypes.AVAILABLE,
+        "Marked everything available. Now drag over the times you're busy"
+      )
+      this.availabilityType = availabilityTypes.BUSY
+    },
+    /** Whether the column is a weekday and the poll has other weekdays to copy it to */
+    canCopyToWeekdays(col) {
+      const isWeekday = (w) => w >= 1 && w <= 5
+      const dayIndex = this.pageColumnToDayIndex(col)
+      if (!isWeekday(this.getColumnWeekday(dayIndex))) return false
+      for (let d = 0; d < this.numColumns; ++d) {
+        if (d !== dayIndex && isWeekday(this.getColumnWeekday(d))) return true
+      }
+      return false
+    },
+    /** Copies a column's availability, row by row, to every other column or to the other weekday columns */
+    copyColumn(col, target) {
+      const dayIndex = this.pageColumnToDayIndex(col)
+      const source = this.getColumnDates(dayIndex).map(
+        (date) => date && this.getSlotType(date.getTime())
+      )
+      const label = `Copied ${this.columnLabel(dayIndex)} to ${
+        target === "weekdays" ? "weekdays" : "all days"
+      }`
+      this.bulkEdit(label, () => {
+        for (let d = 0; d < this.numColumns; ++d) {
+          if (d === dayIndex) continue
+          if (target === "weekdays") {
+            const w = this.getColumnWeekday(d)
+            if (!(w >= 1 && w <= 5)) continue
+          }
+          this.getColumnDates(d).forEach((date, j) => {
+            if (date && source[j]) this.setSlotType(date.getTime(), source[j])
+          })
+        }
+      })
+    },
+    //#endregion
+
     /**
       Returns the current availability as slots for updating the usual week:
       { slots: [{ startDate, durationMinutes, status }], options, timezone } (see mergeSlotsIntoUsualWeek)
@@ -3633,6 +3949,8 @@ export default {
       this.availability = new Set()
       this.ifNeeded = new Set()
       this.usualWeekApplied = false
+      this.lastBulkEdit = null
+      this.loadLastResponse()
 
       if (this.authUser && !this.addingAvailabilityAsGuest) {
         this.resetCurUserAvailability()
@@ -3990,6 +4308,9 @@ export default {
         }
       }
 
+      // A manual edit replaces the last quick fill, so it can no longer be undone
+      if (this.state === this.states.EDIT_AVAILABILITY) this.lastBulkEdit = null
+
       // Set dragging defaults
       this.dragging = false
       this.dragStart = null
@@ -4104,6 +4425,8 @@ export default {
       if (this.isSignUp) {
         this.dragType = this.DRAG_TYPES.ADD
       } else if (
+        (this.state === this.states.EDIT_AVAILABILITY &&
+          this.availabilityType === availabilityTypes.BUSY) ||
         (this.state === this.states.SET_SPECIFIC_TIMES &&
           this.tempTimes.has(date.getTime())) ||
         (this.availabilityType === availabilityTypes.AVAILABLE &&

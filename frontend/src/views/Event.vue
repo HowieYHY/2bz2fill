@@ -464,6 +464,7 @@ import {
   mergeSlotsIntoUsualWeek,
   usualWeekStatuses,
 } from "@/utils/usual_week_utils"
+import { saveLocalLastResponse } from "@/utils/last_response_utils"
 import dayjs from "dayjs"
 import utcPlugin from "dayjs/plugin/utc"
 import timezonePlugin from "dayjs/plugin/timezone"
@@ -851,6 +852,7 @@ export default {
 
       let changesPersisted = true
       const usualWeekOfferResponse = this.getUsualWeekOfferResponse()
+      const lastResponse = this.getLastResponseSnapshot()
 
       if (this.isSignUp) {
         changesPersisted =
@@ -863,6 +865,7 @@ export default {
         this.showInfo("Changes saved!")
         this.scheduleOverlapComponent.stopEditing()
         this.offerUsualWeek(usualWeekOfferResponse)
+        if (lastResponse) saveLocalLastResponse(lastResponse)
       }
     },
     async saveChangesAsGuest(payload) {
@@ -871,10 +874,12 @@ export default {
 
       if (payload.name.length > 0) {
         const usualWeekOfferResponse = this.getUsualWeekOfferResponse()
+        const lastResponse = this.getLastResponseSnapshot()
         await this.scheduleOverlapComponent.submitAvailability(payload)
 
         this.showInfo("Changes saved!")
         this.offerUsualWeek(usualWeekOfferResponse)
+        if (lastResponse) saveLocalLastResponse(lastResponse)
         this.scheduleOverlapComponent.resetCurUserAvailability()
         this.scheduleOverlapComponent.stopEditing()
         this.guestDialog = false
@@ -900,6 +905,22 @@ export default {
         (s) => s.status !== usualWeekStatuses.BUSY
       )
       return hasFreeTime ? response : null
+    },
+    /**
+      Returns the response being submitted, to save in this browser for "reuse my answers" on the next poll,
+      or null if it isn't the user's own availability. Called before submitting, which resets the editing state.
+    */
+    getLastResponseSnapshot() {
+      if (this.isSignUp || this.isGroup || this.event.daysOnly) return null
+      if (!this.scheduleOverlapComponent?.canUseUsualWeek) return null
+      const { slots } = this.scheduleOverlapComponent.getUsualWeekSlots()
+      if (!slots.some((s) => s.status !== usualWeekStatuses.BUSY)) return null
+      return {
+        eventId: this.event._id,
+        eventName: this.event.name,
+        isDow: this.event.type === eventTypes.DOW,
+        slots: slots.map((s) => ({ ...s, startDate: s.startDate.getTime() })),
+      }
     },
     offerUsualWeek(response) {
       if (!response) return

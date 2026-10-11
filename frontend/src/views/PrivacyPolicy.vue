@@ -91,8 +91,9 @@
         </li>
         <li>
           A sign-in cookie that keeps you signed in, and small settings saved in
-          your browser (for example your cookie choices, or your usual week if
-          you're not signed in).
+          your browser (for example your cookie choices, your usual week if
+          you're not signed in, and a copy of the last availability you
+          submitted so you can reuse it on your next poll).
         </li>
       </ul>
       <p>We don't run analytics or advertising trackers.</p>
@@ -207,7 +208,7 @@ export default {
   },
 
   data: () => ({
-    lastUpdated: "11 October 2026",
+    lastUpdated: "12 October 2026",
   }),
 
   computed: {

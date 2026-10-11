@@ -3,6 +3,7 @@
     :value="value"
     @input="(e) => $emit('input', e)"
     :options="options"
+    :compact="showBusy"
   />
 </template>
 
@@ -15,13 +16,30 @@ export default {
 
   props: {
     value: { type: String, required: true },
+    showBusy: { type: Boolean, default: false }, // Adds a "Busy" brush for marking unavailable times
   },
 
   components: { SlideToggle },
 
+  computed: {
+    options() {
+      if (!this.showBusy) return this.baseOptions
+      return [
+        ...this.baseOptions,
+        {
+          text: "Busy",
+          activeClass: "tw-text-red tw-bg-red/5",
+          borderClass: "tw-border-red",
+          borderStyle: { boxShadow: "0px 2px 8px 0px #DB161630" },
+          value: availabilityTypes.BUSY,
+        },
+      ]
+    },
+  },
+
   data() {
     return {
-      options: [
+      baseOptions: [
         {
           text: "Available",
           activeClass: "tw-text-green tw-bg-green/5",
