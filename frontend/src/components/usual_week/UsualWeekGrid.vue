@@ -18,7 +18,7 @@
     </div>
 
     <div class="tw-flex">
-      <!-- Time labels (also where phones can scroll the page, since the grid itself captures touches) -->
+      <!-- Time labels -->
       <div class="tw-w-12 tw-flex-none sm:tw-w-14">
         <div
           v-for="slot in slots"
@@ -38,12 +38,15 @@
       <div
         ref="grid"
         class="tw-flex tw-flex-1 tw-overflow-hidden tw-rounded-md tw-border tw-border-gray"
-        style="touch-action: none"
         @pointerdown="startDrag"
         @pointermove="moveDrag"
         @pointerup="endDrag"
         @pointercancel="cancelDrag"
         @lostpointercapture="endDrag"
+        @touchstart="onTouchStart"
+        @touchmove="onTouchMove"
+        @touchend="onTouchEnd"
+        @touchcancel="onTouchCancel"
       >
         <div
           v-for="(day, col) in dayColumns"
@@ -75,6 +78,10 @@ import { getTimeOptions, prefersStartOnMonday } from "@/utils"
 import { usualWeekStatuses } from "@/utils/usual_week_utils"
 
 const SLOT_MINUTES = 30
+// Touch and hold this long (ms) before dragging paints, so a swipe can still scroll the page
+const TOUCH_HOLD_MS = 250
+// How far (px) a finger can wander during the hold before it counts as a scroll
+const TOUCH_MOVE_TOLERANCE = 10
 const SLOTS_PER_DAY = (24 * 60) / SLOT_MINUTES
 
 // Colors match the poll grid while editing availability
@@ -99,6 +106,7 @@ export default {
       dragCur: null,
       dragStatus: null, // Status the dragged range will be set to
       pointerId: null,
+      touchHold: null, // A touch that may become a tap, a drag, or a scroll (see onTouchStart)
     }
   },
 
@@ -172,14 +180,17 @@ export default {
         row: Math.floor((y / rect.height) * SLOTS_PER_DAY),
       }
     },
+    /** Mouse and pen; touch is handled by the touch handlers below so swipes can scroll */
     startDrag(e) {
+      if (e.pointerType === "touch") return
       if (e.button !== 0 || this.dragStart) return
       e.preventDefault()
       window.getSelection()?.removeAllRanges()
       this.pointerId = e.pointerId
       this.$refs.grid.setPointerCapture?.(e.pointerId)
-
-      const cell = this.cellFromEvent(e)
+      this.beginDrag(this.cellFromEvent(e))
+    },
+    beginDrag(cell) {
       this.dragStart = cell
       this.dragCur = cell
       this.dragStatus =
@@ -197,6 +208,9 @@ export default {
     },
     endDrag(e) {
       if (!this.dragStart || e.pointerId !== this.pointerId) return
+      this.applyDrag()
+    },
+    applyDrag() {
       const week = this.value.map((day) => day.slice())
       for (let col = 0; col < 7; ++col) {
         for (let row = 0; row < SLOTS_PER_DAY; ++row) {
@@ -211,6 +225,57 @@ export default {
       }
       this.resetDrag()
       this.$emit("input", week)
+    },
+    /*
+      Touch, like the poll grid: a swipe scrolls the page, a tap marks or clears one cell,
+      and touch and hold, then drag, marks or clears a range.
+    */
+    onTouchStart(e) {
+      this.clearTouchHold()
+      if (e.touches.length > 1 || this.dragStart) return
+      const { clientX, clientY } = e.touches[0]
+      const hold = { clientX, clientY, started: false }
+      hold.timer = setTimeout(() => {
+        hold.started = true
+        this.beginDrag(this.cellFromEvent(hold))
+        navigator.vibrate?.(10)
+      }, TOUCH_HOLD_MS)
+      this.touchHold = hold
+    },
+    onTouchMove(e) {
+      const hold = this.touchHold
+      if (!hold) return
+      const { clientX, clientY } = e.touches[0]
+      if (hold.started) {
+        e.preventDefault()
+        const cell = this.cellFromEvent({ clientX, clientY })
+        if (cell.row !== this.dragCur.row || cell.col !== this.dragCur.col) {
+          this.dragCur = cell
+        }
+      } else if (
+        Math.hypot(clientX - hold.clientX, clientY - hold.clientY) >
+          TOUCH_MOVE_TOLERANCE
+      ) {
+        // Moved before the hold: it's a scroll
+        this.clearTouchHold()
+      }
+    },
+    onTouchEnd(e) {
+      const hold = this.touchHold
+      if (!hold) return
+      this.clearTouchHold()
+      if (!hold.started) this.beginDrag(this.cellFromEvent(hold)) // A tap
+      this.applyDrag()
+      // Stop the browser from also sending mouse events for this touch
+      if (e.cancelable) e.preventDefault()
+    },
+    onTouchCancel() {
+      this.clearTouchHold()
+      this.resetDrag()
+    },
+    clearTouchHold() {
+      if (this.touchHold) clearTimeout(this.touchHold.timer)
+      this.touchHold = null
     },
     /** A cancelled pointer (e.g. the browser took over the gesture) abandons the drag instead of applying it */
     cancelDrag(e) {
